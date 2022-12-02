@@ -1,0 +1,529 @@
+---
+title: "Let's play ML models"
+author: "G.A. Olivares-Rentería"
+date: "11/8/2022"
+#output: ioslides_presentation
+#output: slidy_presentation
+runtime: shiny
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+
+library(tidyverse)
+#library(stats)
+library(dplyr)
+library(DT)
+library(plotly)
+library(shiny)
+library(equatiomatic)
+library(stargazer)
+
+source("ML_models_function_for_app.R")
+```
+
+# Introduction
+
+Machine Learning is the science of making computers learn by feeding data and information. The algorithms used in Machine learning are trained with past data (training data) and they can make predictions and decisions when new data comes in.
+
+Machine learning algorithms are classified into 2 types:
+
+- Supervised   
+
+- Unsupervised Learning   
+
+
+---
+
+
+- Supervised: In this case we use a model where the data is already labeled. We use a labeled dataset where we already know the target answer. 
+
+Supervised learning is divided in two types: Regression and Classification.
+
+
+- Unsupervised: In this case, the machine uses unlabeled data and learns on itself without any supervision. The machine tries to find a pattern in the unlabeled data and gives a response. 
+
+Unsupervised learning is divided in two types: Clustering and Association.
+
+---
+
+This time we will focus in supervised models as: 
+
+- Linear model   
+- Logistic regression   
+- Linear Discriminant Analysis (LDA)
+- Quadratic Discriminant Analysis (QDA)
+- KNN
+
+
+---
+
+# Linear model
+
+Linear regression, as its name states it, establishes a linear relation between 2 variables. In general one variable, $Y$ depends on one or more variables $X_i$, called predictors or independent variables. By exploring the behavior of $Y$, it is sometimes fair to assume that the relation between them is linear. It is not a perfect approximation, but as it has been said, it is an approximation.
+
+\begin{equation}
+Y\approx \beta_0+\Sigma_i\beta_iX_i
+\end{equation}
+
+---
+
+
+
+## Linear model-Example
+
+### Calculation by hand of $\hat{\beta_0}$ and $\hat{\beta_1}$ 
+
+Building a linear model involves the normal details we know from basic Mathematics. The intersection with the $y$ axis, $\beta_0$ and the slope $\beta_1$. Since we are talking of data, we have to build those coefficients with the information we have.
+
+The model in this case looks like
+\begin{eqnarray}
+\hat{y_i}&=&\hat{\beta_0}+\hat{\beta_1}x_i.
+\end{eqnarray}
+
+and the values we are looking for are $\hat{\beta_i}$ and $\hat{y_i}$.
+
+----
+
+Let's consider the `Advertising` data set where the `Sales` (thousands of units) of certain product varies depending on the investment made in advertising on `TV`, `Newspaper` and `Radio` (in thousands of dollars). 
+
+
+```{r echo=FALSE}
+
+ ad_data() 
+
+```
+
+----
+
+
+```{r echo=FALSE, context="ui"}
+
+column(2,selectInput("var1", label = "X",
+              choices = colnames(df_ad), width="180px"))
+column(3,selectInput("var2", label = "Y",
+              choices = colnames(df_ad), width="120px"))
+
+plotOutput("plot1",height=500,width=800)
+
+
+```
+
+```{r context="server"}
+
+   x <- reactive({
+    get(input$var1,df_ad)
+  })
+  
+  y <- reactive({
+    get(input$var2,df_ad)
+  })
+
+output$plot1 <- renderPlot({
+
+  Sales_media(!!x(),!!y(),input$var1,input$var2)
+
+})
+
+
+```
+
+<br><br><br>
+
+---
+
+### Calculation by hand of $\hat{\beta_0}$ and $\hat{\beta_1}$ 
+
+Now that we have seen the data, we can establish that we want to know the relation (linear) i.e. between the amount of money invested on TV and how it reflects on Sales.
+
+The coefficients are built under the condition that the error, the *residual sum of squares*, is minimized.
+
+The *residual sum of squares* is calculated considering the error (the difference) between the real data $y$ and our linear model $\hat{y}$, for every point.
+
+The residual for every point of data is defined as
+
+\begin{eqnarray}
+e_i&=&y_i-\hat{y_i},\\
+&=&y_i-(\hat{\beta_0}+\hat{\beta_1}x_i).
+\end{eqnarray}
+
+The sum of the squared residuals, as its name says, will be the sum 
+
+\begin{eqnarray}
+RSS&=&\Sigma_{i=1}^n(y_i-\hat{y_i})^2,\\
+RSS&=&\Sigma_{i=1}^n(y_i-(\hat{\beta_0}+\hat{\beta_1}x_i))^2.
+\end{eqnarray}
+
+---
+
+
+When we minimize $RSS$ we obtain the following results for the coefficients
+
+\begin{eqnarray}
+\hat{\beta_1}&=&\frac{\Sigma_{i=1}^n(x_i-\bar{x})(y_i-\bar{y})}{\Sigma_{i=1}^n(x_i-\bar{x})^2},\\
+\hat{\beta_0}&=&\bar{y}-\hat{\beta_1}\bar{x}.
+\end{eqnarray}
+
+where $\bar{x}$ is the mean of the predictor (in this case `TV`) and $\bar{y}$ is the mean of the dependent variable (in this case `Sales`).
+
+We calculate $\hat{\beta_1}$ and $\hat{\beta_0}$ and we obtain
+
+<br><br><br>
+
+```{r echo=FALSE}
+
+ df_ad_2 <- df_ad %>% 
+  summarise(beta_1=sum((TV-mean(TV))*(Sales-mean(Sales)))/sum((TV-mean(TV))^2),
+             beta_0=mean(Sales)-beta_1*mean(TV)) %>%
+  pivot_longer(cols = 1:2,names_to="Coefficients")
+
+beta_0=round(df_ad_2[[2,2]],2)
+beta_1=round(df_ad_2[[1,2]],2)
+
+ df_ad_2 %>% 
+  datatable(rownames = TRUE,
+            #filter = list(position = 'top', clear = TRUE),
+            caption = "Coeffiecients of linear model for Sales and TV",
+            options = list(searching = FALSE, pageLength = 2, lengthMenu = c(1),scrollX = T,
+                             columnDefs = list(list(className = 'dt-center', targets = 1:1)))
+            ) %>% 
+  formatRound(columns=1:2,digits = 3) 
+
+```
+
+
+---
+
+## Assesing the accuracy of the linear model
+### Calculation by hand of $\epsilon$  
+
+
+In general, we can describe the real relation between $Y$ and $X$ as
+
+\begin{equation}
+Y=f(x)+\epsilon,
+\end{equation}
+
+where $\epsilon$ is the mean zero error term. In the case when $f(x)$ is approximated by the linear function then 
+
+\begin{equation}
+Y=\beta_0+\beta_1X+\epsilon.
+\end{equation}
+
+If you pay attention the last equation is different than the Eq. \@ref(eq:1). 
+
+This means that in order to know how close $\hat{\beta_i}$ to $\beta_i$, we need to calculate the standard errors $SE$ of $\hat{\beta_i}$.
+
+
+---
+
+In this case, we have
+\begin{eqnarray}
+SE(\hat{\beta_0})&=&\sigma_{\epsilon}^2\left[\frac{1}{n}+\frac{\bar{x}^2}{\Sigma_i^n(x_i-\bar{x})^2}\right],\\
+SE(\hat{\beta_1})&=&\left[\frac{\sigma_{\epsilon}^2}{\Sigma_i^n(x_i-\bar{x})^2}\right],
+\end{eqnarray}
+
+where
+\begin{eqnarray}
+\sigma_{\epsilon}=\sqrt{\frac{RSS}{n-2}}
+\end{eqnarray}
+
+is the residual standard error.
+
+---
+
+We obtain
+
+
+```{r echo=FALSE}
+
+df_ad_3 <- df_ad %>% 
+ mutate(RSS=sum((Sales-(beta_0+beta_1*TV))^2), 
+             xm=(TV-mean(TV))^2,
+        sigmae=RSS/(nrow(df_ad)-2),
+       SEb_0 = sqrt((sigmae)*((1/nrow(df_ad))+mean(TV)^2/sum(xm))),
+       SEb_1=sqrt((sigmae)/sum(xm))) 
+
+SEb_0=df_ad_3$SEb_0[1]
+SEb_1=df_ad_3$SEb_1[1]
+
+
+df_ad_3 %>% 
+   pivot_longer(cols = c(SEb_0,SEb_1),names_to="Standard_Error") %>% 
+   select(Standard_Error,value) %>% 
+   slice(1:2) %>% 
+   datatable(rownames = TRUE,
+            #filter = list(position = 'top', clear = TRUE),
+            caption = "Standard error of coefficients for Sales and TV",
+            options = list(searching = FALSE, pageLength = 2, lengthMenu = c(1),scrollX = T,
+                             columnDefs = list(list(className = 'dt-center', targets = 1:1)))
+            ) %>% 
+   formatRound(columns=2,digits = 3) 
+  
+
+```
+
+
+---
+
+## Calculation of confidence interval  
+
+Standard errors can be used to obtain confidence intervals. We look at a 95% confidence interval, that indicates that with $95\%$ of probability the true values of $\beta_i$ are in the range
+
+\begin{eqnarray}
+\hat{\beta_i}\pm 2SE(\hat{\beta_i}),
+\end{eqnarray}
+
+
+
+```{r echo=FALSE}
+
+beta_0_min=round(beta_0-2*SEb_0,2)
+beta_0_max=round(beta_0+2*SEb_0,2)
+beta_1_min=round(beta_1-2*SEb_1,3)
+beta_1_max=round(beta_1+2*SEb_1,3)
+
+tbl <-  tibble("a","b",.rows = 2) 
+  
+tbl[[1,1]]="beta_0"
+tbl[[2,1]]="beta_1"
+tbl[[1,2]]=paste(as.character(beta_0_min), " - " ,as.character(beta_0_max))
+tbl[[2,2]]=paste(as.character(beta_1_min), " - " ,as.character(beta_1_max))
+  
+tbl <- tbl %>% 
+  rename(Variable="\"a\"", Conffidence_Interval="\"b\"")
+
+tbl %>% datatable(rownames = TRUE,
+            #filter = list(position = 'top', clear = TRUE),
+            caption = "Confidence intervals of coefficients for Sales and TV ",
+            options = list(searching = FALSE, pageLength = 2, lengthMenu = c(1),scrollX = T,
+                             columnDefs = list(list(className = 'dt-center', targets = 1:1)))
+            )
+
+  
+
+```
+
+
+---
+
+## Hypothesis test
+
+What we want to achieve in the case of the calculation of a hypothesis test is to prove, a null hypothesis, that there is no linear relation between the variables, meaning 
+
+\begin{eqnarray}
+H_0: \beta_1=0.
+\end{eqnarray}
+
+
+We need to determine whether $\hat{\beta_1}$  is sufficiently far from zero that we can be confident that $\beta_1$ is non-zero. This depends on the standard error $SE(\hat{\beta_1})$.
+
+a) If  $SE(\hat{\beta_1})$, is small, even small values of $\hat{\beta_1}$ can give us evidence that $\beta_1\neq0$.
+
+b) If  $SE(\hat{\beta_1})$, is large, then  $\hat{\beta_1}$ must be large in order to reject the null hypothesis.
+
+This is, again very vague, because what is large or small? To avoid any confusion we calculate the *t-statistics* in the following way
+
+
+\begin{eqnarray}
+t=\frac{\hat{\beta_1}-0}{SE(\hat{\beta_1})}, 
+\end{eqnarray}
+
+which measures the number of standard deviations $\hat{\beta_1}$ is away from $0$.
+
+This means if $t$ is large $\beta_1$ is not close to zero, which makes us reject the null hypothesis. 
+
+By rejecting the null hypothesis, we can be certain, that there is a relation between $Y$ and the predictor $X$.
+
+But what does a large $p$ value means in this case? It translates to a small probability that the null hypothesis is true. 
+
+---
+
+We obtain $t=$ `r round(beta_1/SEb_1,2)` for $\beta_1$ and  the probability that $H_0$ is true based on the $t$ value
+ and  the probability that $H_0$ is true based on  $t$ value is $p-value=$ `r 2*pt(-abs(beta_1/SEb_1),df=nrow(df_ad)-1)`.
+ 
+We can see the probability of $H_0$ to be true is $6.551774810\times10^{-45}$ extremely small, so we can reject the null hypothesis.
+
+---
+
+## Let's play: 
+
+How much do you want to spend in `TV` advertisment?
+
+```{r echo=FALSE, context="ui"}
+
+           numericInput("num_1", 
+                        h3("Investment on TV (USD)"), 
+                        value = 1, width="300px")
+
+textOutput("text_1")
+#span(textOutput("text_1"), style="color:red" )
+
+output$text_1 <-  renderText({
+paste("For an investment of $",input$num_1," USD","the predicted number of sold units is ",lm_by_hand(beta_0,beta_1,input$num_1))
+ 
+  })
+
+ 
+```
+
+---
+
+## Estimated vs. Real
+
+Now we proceed to estimate  `Predicted_Sales` using our linear model and compare the result with the real data
+
+\begin{equation}
+\hat{y_{}}= `r beta_0`+`r beta_1`\times TV
+\end{equation}
+
+```{r}
+
+ df_ad_4 <- df_ad %>% 
+  select(TV,Sales) %>% 
+  mutate(Predicted_Sales=beta_0+beta_1*TV) 
+
+df_ad_4 %>% 
+   datatable(rownames = TRUE,
+            #filter = list(position = 'top', clear = TRUE),
+            caption = "Real vs Predicted Sales for TV investment",
+            options = list(searching = FALSE, pageLength = 5, lengthMenu = c(5,50,100,200),scrollX = T,
+                             columnDefs = list(list(className = 'dt-center', targets = 1:1)))
+            ) %>% 
+  formatRound(columns=3,digits = 1) 
+```
+
+---
+
+<br><br><br>
+
+```{r out.height=600,out.width=800}
+
+ad_real_vs_pred_TV(df_ad_4)
+  
+```
+
+
+
+---
+
+## Assessing the Accuracy of the Model
+
+### Residual Standard Error
+
+We can calculate the *residual standard error* which is the standard deviation of the residuals. This means that a smaller residual standard error means predictions are better. We use the formula
+
+\begin{equation}
+RSE=\sqrt{\frac{RSS}{n-2}}=\sqrt{\frac{\Sigma_{i=1}^n(Y_i-\hat{Y_i})^2}{n-2}},
+\end{equation}
+
+and we calculate with the predictions we made 
+
+```{r}
+
+df_ad_4 %>% 
+  summarise(model="Linear Model 1",RSE=rse(Sales,Predicted_Sales)) %>% 
+  datatable(rownames = TRUE,
+            #filter = list(position = 'top', clear = TRUE),
+            caption = "Real vs Predicted Sales for TV investment",
+            options = list(searching = FALSE, pageLength = 1, scrollX = T,
+                             columnDefs = list(list(className = 'dt-center', targets = 1:1)))
+            ) %>% 
+  formatRound(columns=2,digits = 3) 
+```
+
+### The Coefficient of Determination 
+
+Another way to assess the accuracy of the model is using the coefficient of determination, also known as $R^2$, we can review the formula for $R^2$ and notices what it tells us
+
+\begin{equation}
+R^2=1-\frac{\Sigma_{i=1}^n(Y_i-\hat{Y_i})^2}{\Sigma_{i=1}^n(Y_i-\bar{Y})^2}.
+\end{equation}
+
+Accordingly to the equation, if we model is "good", $R^2$ should be closer to $1$.  It measures how well a statistical model predicts an outcome. You can interpret the $R^2$ as the proportion of variation in the dependent variable that is explained by the statistical model
+
+```{r}
+
+df_ad_4 %>% 
+  summarise(model="Linear Model 1",RSE=RSE(Sales,Predicted_Sales,df_ad_4),
+            R2=R2(Sales,Predicted_Sales)) %>% 
+  datatable(rownames = TRUE,
+            #filter = list(position = 'top', clear = TRUE),
+            caption = "Real vs Predicted Sales for TV investment",
+            options = list(searching = FALSE, pageLength = 1, scrollX = T,
+                             columnDefs = list(list(className = 'dt-center', targets = 1:1)))
+            ) %>% 
+  formatRound(columns=2,digits = 3) 
+```
+
+---
+
+# Now let's play with more variables
+
+We can extend the linear regression model model with one predictor $X_1$, but now including  $X_2$.The variable can be any two of `TV`,`Radio` and `Newspaper`. The development of the model and the essence are the same, but now with an extra predictor.
+
+<br>
+
+\begin{equation}
+Y=\beta_0+\beta_1\times X_1+\beta_2\times X_2.
+\end{equation}
+
+<br>
+
+In this case we are going to use `lm` function, in order to compute in a faster manner the coefficients, $RSE$, $R^2$ and make the predictions.
+
+
+## Linear regression for 2 predictors
+
+Select any two predictor you want to use in your model
+
+<br><br>
+
+```{r echo=FALSE, context="ui"}
+
+column(2,selectInput("var3", label = "Predictor 1",
+              choices = colnames(df_ad), width="180px"))
+column(3,selectInput("var4", label = "Predictor 2",
+              choices = colnames(df_ad), width="120px"))
+
+#PrintOutput("table_2")
+
+  eqOutput("equation")
+#  gt_output("tbl")
+
+
+```
+
+```{r context="server"}
+
+   X_1 <- reactive({
+    get(input$var3,df_ad)
+  })
+
+  X_2 <- reactive({
+    get(input$var4,df_ad)
+  })
+
+  renderPrint({
+
+  lm_ad_2 <- lm(Sales ~ X_1()+X_2(), data=df_ad)
+  summary(lm_ad_2)
+  
+ })
+
+
+renderPrint({
+ lm_ad_2 <- lm(Sales ~ X_1()+X_2(), data=df_ad)
+# lm_ad_2$coefficients[[1]]
+ paste0("y = ", round(lm_ad_2$coefficients[[1]],2),"+",round(lm_ad_2$coefficients[[2]],2), input$var3,"+", round(lm_ad_2$coefficients[[3]],2), input$var4)
+  
+ })
+
+
+
+
+
+```
+
